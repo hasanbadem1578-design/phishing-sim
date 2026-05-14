@@ -53,6 +53,23 @@ export interface GlobalStats {
   submit_rate: number;
 }
 
+export interface DepartmentStat {
+  department: string;
+  sent: number;
+  click_count: number;
+  submit_count: number;
+  click_rate: number;
+  submit_rate: number;
+}
+
+export interface CampaignOverview {
+  name: string;
+  target_count: number;
+  click_rate: number;
+  submit_rate: number;
+  sent_at: string | null;
+}
+
 export interface CampaignStats {
   campaign_id: number;
   campaign_name: string;

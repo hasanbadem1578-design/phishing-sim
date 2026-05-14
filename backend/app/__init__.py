@@ -1,10 +1,13 @@
+from __future__ import annotations
+from typing import Optional
 from flask import Flask
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from .models.base import db
-from .routes import templates, campaigns, users, tracking, stats
+from .routes import templates, campaigns, users, tracking, stats, auth
 
 
-def create_app(config: dict | None = None):
+def create_app(config: Optional[dict] = None):
     app = Flask(__name__)
     app.config.update(
         SQLALCHEMY_DATABASE_URI="sqlite:///phishsim.db",
@@ -14,14 +17,17 @@ def create_app(config: dict | None = None):
         SMTP_HOST="localhost",
         SMTP_PORT=1025,
         MAIL_SENDER="noreply@phishsim.local",
+        JWT_SECRET_KEY="phishsim-dev-secret-change-in-production",
+        JWT_ACCESS_TOKEN_EXPIRES=False,
     )
     if config:
         app.config.update(config)
 
     CORS(app)
     db.init_app(app)
+    JWTManager(app)
 
-    for bp in (templates.bp, campaigns.bp, users.bp, tracking.bp, stats.bp):
+    for bp in (templates.bp, campaigns.bp, users.bp, tracking.bp, stats.bp, auth.bp):
         app.register_blueprint(bp)
 
     with app.app_context():

@@ -1,19 +1,33 @@
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import {
-  Title, Button, Table, Modal, TextInput, Group, ActionIcon, Stack, Badge,
+  Title, Button, Table, Modal, TextInput, Group, ActionIcon, Stack, Badge, Text,
 } from "@mantine/core";
-import { IconTrash, IconPlus } from "@tabler/icons-react";
+import { IconTrash, IconPlus, IconUpload } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
-import { getUsers, createUser, deleteUser } from "../services/api";
+import { getUsers, createUser, deleteUser, importUsersCSV } from "../services/api";
 import type { TargetUser } from "../types";
 
 export default function Users() {
   const [users, setUsers] = useState<TargetUser[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", department: "" });
+  const csvRef = useRef<HTMLInputElement>(null);
 
   const load = () => getUsers().then(setUsers);
   useEffect(() => { load(); }, []);
+
+  const handleCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const res = await importUsersCSV(file);
+      notifications.show({ message: `${res.added} kullanıcı eklendi, ${res.skipped} atlandı`, color: "teal" });
+      load();
+    } catch (err: any) {
+      notifications.show({ message: err.message, color: "red" });
+    }
+    e.target.value = "";
+  };
 
   const handleCreate = async () => {
     try {
@@ -29,12 +43,19 @@ export default function Users() {
 
   return (
     <div>
+      <input ref={csvRef} type="file" accept=".csv" onChange={handleCSV} style={{ display: "none" }} />
       <Group justify="space-between" mb="lg">
         <Title order={2}>Hedef Kullanıcılar</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => setOpen(true)}>
-          Kullanıcı Ekle
-        </Button>
+        <Group>
+          <Button variant="light" leftSection={<IconUpload size={16} />} onClick={() => csvRef.current?.click()}>
+            CSV İçe Aktar
+          </Button>
+          <Button leftSection={<IconPlus size={16} />} onClick={() => setOpen(true)}>
+            Kullanıcı Ekle
+          </Button>
+        </Group>
       </Group>
+      <Text size="xs" c="dimmed" mb="md">CSV formatı: name, email, department (başlık satırı gerekli)</Text>
 
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>

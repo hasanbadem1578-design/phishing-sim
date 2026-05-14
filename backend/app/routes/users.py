@@ -1,3 +1,5 @@
+import csv
+import io
 from flask import Blueprint, request, jsonify
 from ..models.base import db
 from ..models.target_user import TargetUser
@@ -28,6 +30,35 @@ def create_user():
     db.session.add(u)
     db.session.commit()
     return jsonify(u.to_dict()), 201
+
+
+@bp.post("/import-csv")
+def import_csv():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    content = file.read().decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(content))
+
+    added, skipped = 0, 0
+    for row in reader:
+        name = (row.get("name") or row.get("ad") or "").strip()
+        email = (row.get("email") or row.get("eposta") or "").strip()
+        dept = (row.get("department") or row.get("departman") or "").strip() or None
+
+        if not name or not email:
+            skipped += 1
+            continue
+        if TargetUser.query.filter_by(email=email).first():
+            skipped += 1
+            continue
+
+        db.session.add(TargetUser(name=name, email=email, department=dept))
+        added += 1
+
+    db.session.commit()
+    return jsonify({"added": added, "skipped": skipped})
 
 
 @bp.delete("/<int:uid>")

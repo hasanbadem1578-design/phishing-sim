@@ -1,3 +1,4 @@
+from collections import defaultdict
 from flask import Blueprint, jsonify
 from ..models.campaign import Campaign
 from ..models.target_user import TargetUser
@@ -59,3 +60,57 @@ def campaign_stats(cid):
         "high_risk_users": [u.to_dict() for u in high_risk],
         "events": [e.to_dict() for e in events],
     })
+
+
+@bp.get("/departments")
+def department_stats():
+    """Click/submit rates broken down by department."""
+    campaigns = Campaign.query.filter(Campaign.status != "draft").all()
+
+    dept_data: dict = defaultdict(lambda: {"sent": 0, "clicked": set(), "submitted": set()})
+
+    for campaign in campaigns:
+        events_by_user: dict = defaultdict(set)
+        for e in campaign.events:
+            events_by_user[e.user_id].add(e.event_type)
+
+        for user in campaign.targets:
+            dept = user.department or "Belirtilmemiş"
+            dept_data[dept]["sent"] += 1
+            if "click" in events_by_user.get(user.id, set()):
+                dept_data[dept]["clicked"].add((campaign.id, user.id))
+            if "submit" in events_by_user.get(user.id, set()):
+                dept_data[dept]["submitted"].add((campaign.id, user.id))
+
+    result = []
+    for dept, data in dept_data.items():
+        sent = data["sent"]
+        clicked = len(data["clicked"])
+        submitted = len(data["submitted"])
+        result.append({
+            "department": dept,
+            "sent": sent,
+            "click_count": clicked,
+            "submit_count": submitted,
+            "click_rate": round(clicked / sent * 100, 1) if sent else 0,
+            "submit_rate": round(submitted / sent * 100, 1) if sent else 0,
+        })
+
+    result.sort(key=lambda x: x["submit_rate"], reverse=True)
+    return jsonify(result)
+
+
+@bp.get("/campaigns-overview")
+def campaigns_overview():
+    """All campaigns with their rates — for charts."""
+    campaigns = Campaign.query.filter(Campaign.status != "draft").order_by(Campaign.sent_at).all()
+    return jsonify([
+        {
+            "name": c.name,
+            "target_count": len(c.targets),
+            "click_rate": c.to_dict()["click_rate"],
+            "submit_rate": c.to_dict()["submit_rate"],
+            "sent_at": c.sent_at.isoformat() if c.sent_at else None,
+        }
+        for c in campaigns
+    ])
